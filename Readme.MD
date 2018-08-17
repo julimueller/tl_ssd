@@ -11,6 +11,7 @@ The code can be used in two ways:
 
 1. Use TL-SSD only to detect smaller objects with our adaptions in the prior box layer WITHOUT a subsequent state detection. A possible usage of the MultiBoxLayer looks as follows:
 
+2. Use TL-SSD to detect smaller objects AND use the additional state prediction. The multibox layer could then be configured as follows:
 ## Only use the prior box adaptions
 ```
 layer {
@@ -54,9 +55,6 @@ layer {
 
 ```
 ## Use the prior box adaptions AND state detection for TLD
-
-2. Use TL-SSD to detect smaller objects AND use the additional state prediction. The multibox layer could then be configured as follows:
-
 
 ```
 layer {
