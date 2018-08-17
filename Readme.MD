@@ -52,9 +52,9 @@ layer {
   }
 }
 
+```
 ## Use the prior box adaptions AND state detection for TLD
 
-```
 2. Use TL-SSD to detect smaller objects AND use the additional state prediction. The multibox layer could then be configured as follows:
 
 
