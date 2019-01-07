@@ -197,7 +197,7 @@ state_loss_type: LOGISTIC
 
 ```
 ## Test our provided caffemodel on the DriveU Traffic Light Dataset
-
+1. Download the dataset http://traffic-light-data.de/
 ```
 cd test_on_dtld
 
