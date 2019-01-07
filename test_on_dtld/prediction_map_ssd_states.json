@@ -1,0 +1,10 @@
+{
+    "categories":   
+    [
+        {
+            "category": "State",
+            "indices" : [0,  1, 2, 3, 4, 5],
+            "names" : [ "background", "off", "red", "yellow", "red_yellow", "green"]
+        }
+    ]
+}
