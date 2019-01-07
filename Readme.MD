@@ -196,7 +196,11 @@ where 1 = red, 2 = yellow and 3 = green with state_digit: 0.
 state_loss_type: LOGISTIC
 
 ```
+## Test our provided caffemodel on the DriveU Traffic Light Dataset
 
-In progress.
+```
+cd test_on_dtld
 
-Stay tuned
+python ssd_dtld_test.py --predictionmap_file <tl_ssd_path>/test_on_dtld/prediction_map_ssd_states.json --confidence 0.2 --deploy_file <tl_sdd_path>/prototxt/deploy.prototxt --caffemodel_file <tl_sdd_path>caffemodel/SSD_DTLD_iter_90000.caffemodel --test_file <db_dir_path>/DTLD_test.yml
+```
+Do not forget to update the absolute caffe ssd path in ssd_dtld_test.py before importing
