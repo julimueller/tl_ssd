@@ -1,6 +1,8 @@
 # IN PROGRESS: TL-SSD: Detecting Traffic Lights by Single Shot Detection
 This respository provides code for our single shot detection method to detect traffic lights. Paper is accepted for ITSC2018. The code builds upon the official SSD-Caffe-Repository (see here https://github.com/weiliu89/caffe).
 
+[![IMAGE ALT TEXT HERE](https://github.com/julimueller/tl_ssd/blob/master/vid/vid_thumb.png)](https://www.youtube.com/watch?v=ei0FkLMJs04&feature=youtu.be)
+
 Following steps are recommended:
 
 1. Download and build the original caffe-ssd repository according to their instructions.
@@ -194,7 +196,11 @@ where 1 = red, 2 = yellow and 3 = green with state_digit: 0.
 state_loss_type: LOGISTIC
 
 ```
+## Test our provided caffemodel on the DriveU Traffic Light Dataset
+1. Download the dataset http://traffic-light-data.de/
+```
+cd test_on_dtld
 
-In progress.
-
-Stay tuned
+python ssd_dtld_test.py --predictionmap_file <tl_ssd_path>/test_on_dtld/prediction_map_ssd_states.json --confidence 0.2 --deploy_file <tl_sdd_path>/prototxt/deploy.prototxt --caffemodel_file <tl_sdd_path>caffemodel/SSD_DTLD_iter_90000.caffemodel --test_file <db_dir_path>/DTLD_test.yml
+```
+Do not forget to update the absolute caffe ssd path in ssd_dtld_test.py before importing
