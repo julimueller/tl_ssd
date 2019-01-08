@@ -293,9 +293,6 @@ void MultiBoxLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
                    &num_matches_, &num_negs, &all_match_indices_,
                    &all_neg_indices_);
 
-  //std::cout << "Num matches" << num_matches_ << std::endl;
-  //std::cout << "Num negs" << num_negs << std::endl;
-
   if (num_matches_ >= 1) {
     // Form data to pass on to loc_loss_layer_.
     vector<int> loc_shape(2);
