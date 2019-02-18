@@ -137,6 +137,7 @@ class MultiBoxLossLayer : public LossLayer<Dtype> {
   vector<vector<int> > all_neg_indices_;
 
   bool do_state_prediction_;
+  int state_digit_;
   // How to normalize the loss.
   LossParameter_NormalizationMode normalization_;
 };

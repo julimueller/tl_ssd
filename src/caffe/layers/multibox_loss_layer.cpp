@@ -43,7 +43,7 @@ void MultiBoxLossLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
   if (do_state_prediction_) {
       num_states_ = multibox_loss_param.num_states();
       CHECK_GE(num_states_, 1) << "num_classes should not be less than 1.";
-
+      state_digit_ = multibox_loss_param.state_digit();
   }
   share_location_ = multibox_loss_param.share_location();
   loc_classes_ = share_location_ ? 1 : num_classes_;
@@ -265,8 +265,16 @@ void MultiBoxLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
 
   // Retrieve all ground truth.
   map<int, vector<NormalizedBBox> > all_gt_bboxes;
-  GetGroundTruth(gt_data, num_gt_, background_label_id_, use_difficult_gt_,
-                 &all_gt_bboxes, do_state_prediction_);
+
+  if (do_state_prediction_) {
+      GetGroundTruth(gt_data, num_gt_, background_label_id_, use_difficult_gt_,
+                     &all_gt_bboxes, do_state_prediction_);
+  }
+  else {
+      GetGroundTruthState(gt_data, num_gt_, background_label_id_, use_difficult_gt_,
+                     &all_gt_bboxes, state_digit_, background_state_id_);
+  }
+
 
   // Retrieve all prior bboxes. It is same within a batch since we assume all
   // images in a batch are of same dimension.
@@ -293,7 +301,7 @@ void MultiBoxLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
                    &num_matches_, &num_negs, &all_match_indices_,
                    &all_neg_indices_);
 
-  //std::cout << "Num matches" << num_matches_ << std::endl;
+  // << "Num matches" << num_matches_ << std::endl;
   //std::cout << "Num negs" << num_negs << std::endl;
 
   if (num_matches_ >= 1) {
