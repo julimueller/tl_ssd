@@ -208,6 +208,16 @@ void GetGroundTruth(const Dtype* gt_data, const int num_gt,
       const int background_label_id, const bool use_difficult_gt,
       map<int, LabelBBox>* all_gt_bboxes, const bool &do_state_prediction);
 
+template <typename Dtype>
+void GetGroundTruthState(const Dtype* gt_data, const int num_gt,
+      const int background_label_id, const bool use_difficult_gt,
+      map<int, vector<NormalizedBBox> >* all_gt_bboxes, const int &state_digit, const int &background_state_id);
+// Store ground truth bboxes of same label in a group.
+template <typename Dtype>
+void GetGroundTruthState(const Dtype* gt_data, const int num_gt,
+      const int background_label_id, const bool use_difficult_gt,
+      map<int, LabelBBox>* all_gt_bboxes, const int &state_digit, const int &background_state_id);
+
 // Get location predictions from loc_data.
 //    loc_data: num x num_preds_per_class * num_loc_classes * 4 blob.
 //    num: the number of images.

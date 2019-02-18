@@ -1200,6 +1200,135 @@ template void GetGroundTruth(const double* gt_data, const int num_gt,
       const int background_label_id, const bool use_difficult_gt,
       map<int, LabelBBox>* all_gt_bboxes, const bool &state_prediction);
 
+
+template <typename Dtype>
+void GetGroundTruthState(const Dtype* gt_data, const int num_gt,
+      const int background_label_id, const bool use_difficult_gt,
+      map<int, vector<NormalizedBBox> >* all_gt_bboxes, const int &state_digit, const int &background_state_id) {
+  all_gt_bboxes->clear();
+  for (int i = 0; i < num_gt; ++i) {
+    int start_idx = i * 8;
+    int label, state;
+
+    int label_int = int(gt_data[start_idx + 1]);
+    int nr_digits = log10((float)label_int) +1;
+
+    int divisor;
+    int digit;
+    std::vector<int> digits;
+    for (size_t j = nr_digits -1; j > 0; j--) {
+        divisor = pow((float)10, j);
+        digit = label_int / divisor;
+        label_int -= digit * divisor;
+        digits.push_back(digit);
+    }
+    digits.push_back(label_int);
+
+    state = digits.at(state_digit);
+
+    int item_id = gt_data[start_idx];
+    if (item_id == -1) {
+      continue;
+    }
+    CHECK_NE(background_label_id, label_int)
+        << "Found background label in the dataset.";
+    CHECK_NE(background_state_id, state)
+        << "Found background state in the dataset.";
+    bool difficult = static_cast<bool>(gt_data[start_idx + 7]);
+    if (!use_difficult_gt && difficult) {
+      // Skip reading difficult ground truth.
+      continue;
+    }
+    NormalizedBBox bbox;
+    bbox.set_label(label);
+    bbox.set_state(state);
+    bbox.set_xmin(gt_data[start_idx + 3]);
+    bbox.set_ymin(gt_data[start_idx + 4]);
+    bbox.set_xmax(gt_data[start_idx + 5]);
+    bbox.set_ymax(gt_data[start_idx + 6]);
+    bbox.set_difficult(difficult);
+
+    float bbox_size = BBoxSize(bbox);
+    bbox.set_size(bbox_size);
+    (*all_gt_bboxes)[item_id].push_back(bbox);
+  }
+}
+
+// Explicit initialization.
+template void GetGroundTruthState(const float* gt_data, const int num_gt,
+      const int background_label_id, const bool use_difficult_gt,
+      map<int, vector<NormalizedBBox> >* all_gt_bboxes, const int &state_digit, const int &background_state_id);
+template void GetGroundTruthState(const double* gt_data, const int num_gt,
+      const int background_label_id, const bool use_difficult_gt,
+      map<int, vector<NormalizedBBox> >* all_gt_bboxes, const int &state_digit, const int &background_state_id);
+
+template <typename Dtype>
+void GetGroundTruthState(const Dtype* gt_data, const int num_gt,
+      const int background_label_id, const bool use_difficult_gt,
+      map<int, LabelBBox>* all_gt_bboxes, const int &state_digit, const int &background_state_id) {
+  all_gt_bboxes->clear();
+  for (int i = 0; i < num_gt; ++i) {
+    int start_idx = i * 8;
+    int item_id = gt_data[start_idx];
+    int state = -1;
+    if (item_id == -1) {
+      break;
+    }
+    NormalizedBBox bbox;
+
+    int label_int = int(gt_data[start_idx + 1]);
+    int nr_digits = log10((float)label_int) +1;
+
+    int divisor;
+    int digit;
+    std::cout << "Cid: " << label_int << std::endl;
+    std::vector<int> digits;
+    for (size_t j = nr_digits -1; j > 0; j--) {
+        divisor = pow((float)10, j);
+        digit = label_int / divisor;
+        label_int -= digit * divisor;
+        digits.push_back(digit);
+    }
+
+    digits.push_back(label_int);
+
+
+    //TODO: Remove hard coded values
+    state = digits.at(state_digit) +1;
+
+
+    CHECK_NE(background_label_id, label_int)
+        << "Found background label in the dataset.";
+    CHECK_NE(background_state_id, state)
+        << "Found background state in the dataset.";
+    bool difficult = static_cast<bool>(gt_data[start_idx + 7]);
+    if (!use_difficult_gt && difficult) {
+      // Skip reading difficult ground truth.
+      continue;
+    }
+    bbox.set_xmin(gt_data[start_idx + 3]);
+    bbox.set_ymin(gt_data[start_idx + 4]);
+    bbox.set_xmax(gt_data[start_idx + 5]);
+    bbox.set_ymax(gt_data[start_idx + 6]);
+    bbox.set_state(state);
+    bbox.set_difficult(difficult);
+    float bbox_size = BBoxSize(bbox);
+    bbox.set_size(bbox_size);
+    (*all_gt_bboxes)[item_id][label_int].push_back(bbox);
+  }
+}
+
+// Explicit initialization.
+template void GetGroundTruthState(const float* gt_data, const int num_gt,
+      const int background_label_id, const bool use_difficult_gt,
+      map<int, LabelBBox>* all_gt_bboxes, const int &state_digit, const int &background_state_id);
+template void GetGroundTruthState(const double* gt_data, const int num_gt,
+      const int background_label_id, const bool use_difficult_gt,
+      map<int, LabelBBox>* all_gt_bboxes, const int &state_digit, const int &background_state_id);
+
+
+
+
 template <typename Dtype>
 void GetLocPredictions(const Dtype* loc_data, const int num,
       const int num_preds_per_class, const int num_loc_classes,
