@@ -1077,7 +1077,7 @@ message DetectionOutputParameter {
   optional string save_file = 12;
   // If true, allow multilabel classification and return confidence vector
   optional bool do_state_prediction = 13 [default = false];
-  // Number of states
+
   optional uint32 num_states = 14 [default = 6];
 
 }
@@ -1375,8 +1375,7 @@ message MultiBoxLossParameter {
   optional bool do_state_prediction = 30 [default = false];
   optional uint32 num_states = 31;
   optional uint32 background_state_id = 32 [default = 0];
-
-
+  optional uint32 state_digit = 33 [default = 4];
 
 }
 
