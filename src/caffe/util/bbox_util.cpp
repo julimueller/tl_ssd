@@ -612,7 +612,6 @@ void MatchBBox(const vector<NormalizedBBox>& gt_bboxes,
 
   // Store the positive overlap between predictions and ground truth.
   map<int, map<int, float> > overlaps;
-  //std::cout << "Preds:" << num_pred << std::endl;
   for (int i = 0; i < num_pred; ++i) {
     if (ignore_cross_boundary_bbox && IsCrossBoundaryBBox(pred_bboxes[i])) {
       (*match_indices)[i] = -2;
@@ -620,9 +619,6 @@ void MatchBBox(const vector<NormalizedBBox>& gt_bboxes,
     }
     for (int j = 0; j < num_gt; ++j) {
       float overlap = JaccardOverlap(pred_bboxes[i], gt_bboxes[gt_indices[j]]);
-      //std::cout << "pred" << pred_bboxes[i].xmin() * 512 << ";" << pred_bboxes[i].ymin() * 512<< ";" <<(pred_bboxes[i].xmax() - pred_bboxes[i].xmin() ) * 512<< ";" << (pred_bboxes[i].ymax() - pred_bboxes[i].ymin() )* 512  <<  std::endl;
-      //std::cout << "gt" << gt_bboxes[gt_indices[j]].xmin() * 512 << ";" << gt_bboxes[gt_indices[j]].ymin() * 512<< ";" <<(gt_bboxes[gt_indices[j]].xmax() - gt_bboxes[gt_indices[j]].xmin() ) * 512<< ";" << (gt_bboxes[gt_indices[j]].ymax() - gt_bboxes[gt_indices[j]].ymin() )* 512  <<  std::endl;
-
       if (overlap > 1e-6) {
         (*match_overlaps)[i] = std::max((*match_overlaps)[i], overlap);
         overlaps[i][j] = overlap;
@@ -660,13 +656,11 @@ void MatchBBox(const vector<NormalizedBBox>& gt_bboxes,
           max_idx = i;
           max_gt_idx = j;
           max_overlap = it->second[j];
-          //std::cout << "Max overlap" << max_overlap << std::endl;
         }
       }
     }
     if (max_idx == -1) {
       // Cannot find good match.
-      //std::cout << "No good overlap" << std::endl;
       break;
     } else {
       CHECK_EQ((*match_indices)[max_idx], -1);
@@ -704,7 +698,6 @@ void MatchBBox(const vector<NormalizedBBox>& gt_bboxes,
             // and the overlap is larger than maximum overlap, update.
             max_gt_idx = j;
             max_overlap = overlap;
-            //std::cout << "MAX IOU: " << max_overlap << std::endl;
           }
         }
         if (max_gt_idx != -1) {
@@ -1091,7 +1084,6 @@ void GetGroundTruth(const Dtype* gt_data, const int num_gt,
 
         //TODO: Remove hard coded values
         state = digits.at(state_digit_nr);
-        //std::cout << "State: " << state << std::endl;
     }
     int item_id = gt_data[start_idx];
     if (item_id == -1) {
@@ -1152,7 +1144,6 @@ void GetGroundTruth(const Dtype* gt_data, const int num_gt,
 
         int divisor;
         int digit;
-        std::cout << "Cid: " << label_int << std::endl;
         std::vector<int> digits;
         for (size_t j = nr_digits -1; j > 0; j--) {
             divisor = pow((float)10, j);
@@ -1169,8 +1160,7 @@ void GetGroundTruth(const Dtype* gt_data, const int num_gt,
         label = 1;
 
         //TODO: Remove hard coded values
-        state = digits.at(state_digit_nr) +1;
-        std::cout << "State: " << state << std::endl;
+        state = digits.at(state_digit_nr);
 
     }
     CHECK_NE(background_label_id, label)
