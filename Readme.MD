@@ -1,5 +1,5 @@
 # TL-SSD: Detecting Traffic Lights by Single Shot Detection
-This respository provides code for our single shot detection method to detect traffic lights. Paper is accepted for ITSC2018. The code builds upon the official SSD-Caffe-Repository (see here https://github.com/weiliu89/caffe).
+This respository provides code for our single shot detection method to detect traffic lights. Paper is accepted for ITSC2018. The code builds upon the official SSD-Caffe-Repository (see here https://github.com/weiliu89/caffe). It presents a prior box/anchor box adaptation to increase recall on small objects using SSD.
 
 [![IMAGE ALT TEXT HERE](https://github.com/julimueller/tl_ssd/blob/master/vid/vid_thumb.png)](https://www.youtube.com/watch?v=ei0FkLMJs04&feature=youtu.be)
 
