@@ -1,13 +1,23 @@
+from __future__ import print_function
+
+__author__ = "Julian Mueller and Klaus Dietmayer"
+__maintainer__ = "Julian Mueller"
+__email__ = "julian.mu.mueller@daimler.com"
+
 import argparse
 import json
+import logging
 import os
+os.environ["GLOG_minloglevel"] = "2"
+
 import sys
 import warnings
 
 import cv2
-import matplotlib.pyplot as plt
 import numpy as np
 
+# if import caffe fails test export PYTHONPATH=<ssd_dir>/ssd/python:$PYTHONPATH
+# and make sure you complied with make pycaffe before
 import caffe
 import load_dtld as driveu_dataset
 import progressbar
@@ -16,63 +26,223 @@ import progressbar
 caffe_root = "./"
 os.chdir(caffe_root)
 sys.path.insert(0, os.path.join(caffe_root, "python"))
-os.environ["GLOG_minloglevel"] = "2"
+
+# Logging
+logging.basicConfig(
+    stream=sys.stdout,
+    level=logging.INFO,
+    format="%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+
+# DEFINITIONS
+RGB_MEAN = [60, 60, 60]
+IMAGE_MAX_VALUE = 255
+SSD_INPUT_IMAGE_WIDTH = 2048
+SSD_INPUT_IMAGE_HEIGHT = 512
+
+
+class LabelMap:
+    """
+    This class loads a labelmap which transforms a vector of floats into the
+    winning class
+    """
+
+    def __init__(
+        self, label_map_file_path: str = "prediction_map_ssd_states.json"
+    ):
+        """
+        LabelMap initialization and loading
+
+        Args:
+            label_map_file_path(str): Labelmap file path
+        """
+        self.label_map_file_path = label_map_file_path
+
+        # load it
+        self.__load__()
+
+    def __load__(self):
+        """
+        Loads label map.
+        """
+        self.categories = []
+        self.indices = []
+        self.names = []
+        with open(self.label_map_file_path) as json_data:
+            logging.info("Loading labelmap")
+
+            d = json.load(json_data)
+            try:
+                if len(d["categories"][0]["indices"]) != len(
+                    d["categories"][0]["names"]
+                ):
+                    raise (
+                        AssertionError(
+                            "ERROR: Indices and Names should have the same length!"
+                        )
+                    )
+                for category in d["categories"]:
+                    self.categories.append(category["category"])
+                    self.indices.append(category["indices"])
+                    self.names.append([x for x in category["names"]])
+            except ValueError:
+                print("ERROR: File Format seems not be correct!")
+
+        logging.info("Labelmap successfully loaded")
+
+    def class_vec_to_tags(self, class_vec: list):
+        """
+        This method converts a list of float confidences into the winning
+        class by using the argmax
+
+        Args:
+            class_vec(list): list of floats,
+            e.g. [0.01, 0.12, 0.55, 0.02, 0.01, 0.11]
+
+        Returns:
+            winning class as tag, e.g. [0.01, 0.12, 0.55, 0.02, 0.01, 0.11]
+            -> idx: 2, tag: red
+        """
+        tags = []
+        for category, indices, names in zip(
+            self.categories, self.indices, self.names
+        ):
+            confidences = [class_vec[i] for i in indices]
+            idx = np.argmax(confidences)
+            tags.append(str(names[idx]))
+
+        return tags
+
+    def get_number_classes(self, category: str):
+        """
+        This method returns the number of classes per category
+
+        Args:
+            category(str): name of category
+        Returns:
+            int: Number of classes of category
+        """
+        idx_category = self.categories.index(category)
+        return len(self.names[idx_category])
 
 
 class CaffeDetection:
+    """
+    This class loads a trained caffe network and initializes a transformer
+    converting which can convert an input image.
+    """
+
     def __init__(
         self,
-        gpu_id,
-        model_def,
-        model_weights,
-        image_resize_width,
-        image_resize_height,
-        labelmap_file,
+        gpu_id: int = 0,
+        model_def: str = "../prototxt/deploy.prototxt",
+        model_weights: str = "../caffemodel/SSD_DTLD_iter_90000.caffemodel",
+        image_resize_width: int = SSD_INPUT_IMAGE_WIDTH,
+        image_resize_height: int = SSD_INPUT_IMAGE_HEIGHT,
+        labelmap_file_path: str = "prediction_map_ssd_states.json",
     ):
+        """
+        Initilize CaffeDetection
+
+        Args:
+            gpu_id(int): GPU ID. If your workstation only has only one set 0
+            model_def(str): prototxt file path of deploy network
+            model_weights(str): caffemodel file
+            image_resize_width: width of input image
+            image_resize_height: height of input image
+            labelmap_file_path: path of labelmap for converting state indices
+
+        """
+        # Set GPU ID and GPU mode
         caffe.set_device(gpu_id)
         caffe.set_mode_gpu()
 
         self.image_resize_width = image_resize_width
         self.image_resize_height = image_resize_height
-        # Load the net in the test phase for inference, and configure input preprocessing.
+        # Load the net in the test phase for inference, and configure
+        # input preprocessing.
         self.net = caffe.Net(
             model_def,  # defines the structure of the model
             model_weights,  # contains the trained weights
             caffe.TEST,
-        )  # use test mode (e.g., don't perform dropout)
-        # input preprocessing: 'data' is the name of the input blob == net.inputs[0]
+        )
+        # Input preprocessing: 'data' is the name of the input
+        # blob == net.inputs[0]
         self.transformer = caffe.io.Transformer(
             {"data": self.net.blobs["data"].data.shape}
         )
+        # Opencv is BGR
         self.transformer.set_transpose("data", (2, 0, 1))
-        self.transformer.set_mean("data", np.array([60, 60, 60]))  # mean pixel
-        # the reference model operates on images in [0,255] range instead of [0,1]
-        self.transformer.set_raw_scale("data", 255)
+        # Set image mean --> DTLD is (60, 60, 60)
+        # if you apply tl_ssd to another dataset please determine the dataset
+        #  mean and test the performance by changing RGB_MEAN
+        self.transformer.set_mean("data", np.array(RGB_MEAN))
+        # The reference model operates on images in [0,255] range
+        # instead of [0,1]
+        self.transformer.set_raw_scale("data", IMAGE_MAX_VALUE)
+        # Get names and indices for state prediction
+        self.label_map = LabelMap(labelmap_file_path)
+        # Get number of states
+        self.num_states = self.label_map.get_number_classes(category="State")
 
-        self.categories, self.indices, self.classes = self.get_names(
-            labelmap_file
-        )
-
-    def class_vec_to_tags(self, class_vec):
-
-        tags = []
-        for category, indices, classes in zip(
-            self.categories, self.indices, self.classes
-        ):
-            confidences = [class_vec[i] for i in indices]
-            idx = np.argmax(confidences)
-            tags.append(str(classes[idx]))
-
-        return tags
-
-    def detect(self, image, confidence):
+    def parse_network_output(self, output, confidence_threshold: float = 0.5):
         """
-        SSD detection
+        This method takes the raw SSD network output and returns a list of
+        dictionaries
+
+        Args:
+            output(np.array): Output of detection_output_layer.count()
+            confidence_threshold(float): Confidence threshold. Detections with
+            lower confidence are neglected
+
+        Returns:
+            List of detections as dict
+
+        """
+
+        # Parse the outputs.
+        confidences = output[0, 0, :, 2]
+        state_confidences = output[0, 0, :, 3 : 3 + self.num_states]
+        xmin_coordinates = output[0, 0, :, 3 + self.num_states]
+        ymin_coordinates = output[0, 0, :, 3 + self.num_states + 1]
+        xmax_coordinates = output[0, 0, :, 3 + self.num_states + 2]
+        ymax_coordinates = output[0, 0, :, 3 + self.num_states + 3]
+
+        result = []
+
+        for i in range(len(xmin_coordinates)):
+            tags = []
+            if confidences[i] >= confidence_threshold:
+                xmin = int(round(xmin_coordinates[i] * SSD_INPUT_IMAGE_WIDTH))
+                ymin = int(round(ymin_coordinates[i] * SSD_INPUT_IMAGE_HEIGHT))
+                xmax = int(round(xmax_coordinates[i] * SSD_INPUT_IMAGE_WIDTH))
+                ymax = int(round(ymax_coordinates[i] * SSD_INPUT_IMAGE_HEIGHT))
+                tags.extend(
+                    self.label_map.class_vec_to_tags(state_confidences[i])
+                )
+                detection = {
+                    "xmin": xmin,
+                    "xmax": xmax,
+                    "ymin": ymin,
+                    "ymax": ymax,
+                    "confidence": confidences[i],
+                    "tags": tags,
+                }
+                result.append(detection)
+        return result
+
+    def detect(self, image: np.array, confidence_threshold: float = 0.5):
+        """
+        This method detects traffic lights in the input image for a given
+        confidence threshold
+
+        Args:
+            image(np.array): Numpy array image in BGR format (OpenCV)
+            confidence(float): confidence threshold. Only detections with
+            confidence >= confidence_threshold are returned
         """
         # set net to batch size of 1
-
-        orig_image_width = 2048
-        orig_image_height = 512
 
         image_resized = cv2.resize(
             image, (self.image_resize_width, self.image_resize_height)
@@ -85,61 +255,7 @@ class CaffeDetection:
 
         detections = self.net.forward()["detection_out"]
 
-        num_states = 5
-
-        # Parse the outputs.
-        det_conf = detections[0, 0, :, 2]
-        det_states = detections[0, 0, :, 3 : 3 + num_states + 1]
-        det_xmin = detections[0, 0, :, 3 + num_states + 1]
-        det_ymin = detections[0, 0, :, 3 + num_states + 2]
-        det_xmax = detections[0, 0, :, 3 + num_states + 3]
-        det_ymax = detections[0, 0, :, 3 + num_states + 4]
-        det_states[:, 0] = 0.0
-
-        result = []
-
-        for i in range(len(det_xmin)):
-            tags = []
-            if np.max(det_conf[i]) > confidence:
-                xmin = int(
-                    round(det_xmin[i] * orig_image_width)
-                )  # xmin = int(round(top_xmin[i] * image.shape[1]))
-                ymin = int(
-                    round(det_ymin[i] * orig_image_height)
-                )  # ymin = int(round(top_ymin[i] * image.shape[0]))
-                xmax = int(
-                    round(det_xmax[i] * orig_image_width)
-                )  # xmax = int(round(top_xmax[i] * image.shape[1]))
-                ymax = int(
-                    round(det_ymax[i] * orig_image_height)
-                )  # ymax = int(round(top_ymax[i] * image.shape[0]))
-                score = np.sum(det_conf[i])
-                tags.extend(self.class_vec_to_tags(det_states[i]))
-                result.append([xmin, ymin, xmax, ymax, tags, score])
-        return result
-
-    def get_names(self, name_file):
-        categories = []
-        indices = []
-        names = []
-        with open(name_file) as json_data:
-            d = json.load(json_data)
-            try:
-                if len(d["categories"][0]["indices"]) != len(
-                    d["categories"][0]["names"]
-                ):
-                    raise (
-                        AssertionError(
-                            "ERROR: Indices and Names should have the same length!"
-                        )
-                    )
-                for category in d["categories"]:
-                    categories.append(category["category"].encode("UTF8"))
-                    indices.append(category["indices"])
-                    names.append([x.encode("UTF8") for x in category["names"]])
-                return categories, indices, names
-            except ValueError:
-                print("ERROR: File Format seems not be correct!")
+        return self.parse_network_output(detections, confidence_threshold)
 
 
 def main(args):
@@ -154,12 +270,11 @@ def main(args):
         args.predictionmap_file,
     )
 
-    # open test file in yml format
+    # Open test file in yml format
     database = driveu_dataset.DriveuDatabase(args.test_file)
     database.open("")
-    cnt = 0
-    # evaluate all images
 
+    # Progressbar
     warnings.filterwarnings("ignore", category=DeprecationWarning)
     widgets = [progressbar.Percentage(), progressbar.Bar()]
     print("\nGoing through all images")
@@ -169,50 +284,54 @@ def main(args):
 
     for idx, img in enumerate(database.images):
 
-        cnt += 1
-
-        # get 8 bit color image from database
+        # Get 8 bit color image from database
         status, img_color_orig = img.getImage()
-
+        # Crop image
         img_color = img_color_orig[0:512, 0:2048]
-
-        # save original image size
-        orig_img_width = len(img_color[0])
-        orig_img_height = len(img_color)
-
-        # detect with ssd
+        # Detect with ssd
         result = detection.detect(img_color, args.confidence)
-        bar.update(idx)
-
+        # Plot each detection
         for item in result:
 
-            x1 = item[0]
-            y1 = item[1]
-            x2 = item[2]
-            y2 = item[3]
+            xmin = item["xmin"]
+            ymin = item["ymin"]
+            xmax = item["xmax"]
+            ymax = item["ymax"]
 
             # Colorize depending on the state
-            if "red_yellow" in item[4]:
+            if "red_yellow" in item["tags"]:
                 cv2.rectangle(
-                    img_color_orig, (x1, y1), (x2, y2), (0, 165, 255), 2
+                    img_color_orig,
+                    (xmin, ymin),
+                    (xmax, ymax),
+                    (0, 165, 255),
+                    2,
                 )
-            elif "red" in item[4]:
+            elif "red" in item["tags"]:
                 cv2.rectangle(
-                    img_color_orig, (x1, y1), (x2, y2), (0, 0, 255), 2
+                    img_color_orig, (xmin, ymin), (xmax, ymax), (0, 0, 255), 2
                 )
-            elif "green" in item[4]:
+            elif "green" in item["tags"]:
                 cv2.rectangle(
-                    img_color_orig, (x1, y1), (x2, y2), (0, 255, 0), 2
+                    img_color_orig, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2
                 )
-            elif "yellow" in item[4]:
+            elif "yellow" in item["tags"]:
                 cv2.rectangle(
-                    img_color_orig, (x1, y1), (x2, y2), (0, 255, 255), 2
+                    img_color_orig,
+                    (xmin, ymin),
+                    (xmax, ymax),
+                    (0, 255, 255),
+                    2,
                 )
             else:
                 cv2.rectangle(
-                    img_color_orig, (x1, y1), (x2, y2), (255, 255, 255), 2
+                    img_color_orig,
+                    (xmin, ymin),
+                    (xmax, ymax),
+                    (255, 255, 255),
+                    2,
                 )
-
+        bar.update(idx)
         cv2.imshow("SSD DTLD Results", img_color_orig)
         cv2.waitKey(0)
     bar.finish()
@@ -224,18 +343,18 @@ def parse_args():
     parser.add_argument("--gpu_id", type=int, default=0, help="gpu id")
     parser.add_argument(
         "--predictionmap_file",
-        default="/home/muejul3/git_repos/ssd/caffe/data/tla/labelmap_tla_daimler_binary_red_negatives.prototxt",
+        default="prediction_map_ssd_states.json",
     )
     parser.add_argument("--image_resize_width", default=2048, type=int)
     parser.add_argument("--image_resize_height", default=512, type=int)
     parser.add_argument("--confidence", default=0.5, type=float)
     parser.add_argument(
         "--deploy_file",
-        default="/home/muejul3/git_repos/ssd/caffe/experiments/TLA_TRAIN_BINARY_RED_NEGATIVES/conv43_conv53/models/deploy.prototxt",
+        default="../prototxt/deploy.prototxt",
     )
     parser.add_argument(
         "--caffemodel_file",
-        default="/home/muejul3/git_repos/ssd/caffe/experiments/TLA_TRAIN_BINARY_RED_NEGATIVES/conv43_conv53/models/TLA_SSD_TLA_1024x512_iter_60000.caffemodel",
+        default="../caffemodel/SSD_DTLD_iter_90000.caffemodel",
     )
     parser.add_argument("--test_file", default="")
 
