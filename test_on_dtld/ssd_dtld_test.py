@@ -3,14 +3,13 @@ import json
 import os
 import sys
 import warnings
-from enum import Enum
 
+import cv2
+import matplotlib.pyplot as plt
 import numpy as np
 
 import caffe
-import cv2
 import load_dtld as driveu_dataset
-import matplotlib.pyplot as plt
 import progressbar
 
 # Make sure that caffe is on the python path:
