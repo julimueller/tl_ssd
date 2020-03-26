@@ -7,20 +7,24 @@ __email__ = "julian.mu.mueller@daimler.com"
 import argparse
 import json
 import logging
-import os
-os.environ["GLOG_minloglevel"] = "2"
-
 import sys
 import warnings
 
 import cv2
+import matplotlib.pyplot as plt
 import numpy as np
 
 # if import caffe fails test export PYTHONPATH=<ssd_dir>/ssd/python:$PYTHONPATH
 # and make sure you complied with make pycaffe before
 import caffe
-import load_dtld as driveu_dataset
 import progressbar
+# if import fails please clone https://github.com/julimueller/dtld_parsing and
+# install via python setup.py install
+from dtld_parsing.driveu_dataset import DriveuDatabase
+
+import os
+os.environ["GLOG_minloglevel"] = "2"
+
 
 # Make sure that caffe is on the python path:
 caffe_root = "./"
@@ -31,7 +35,8 @@ sys.path.insert(0, os.path.join(caffe_root, "python"))
 logging.basicConfig(
     stream=sys.stdout,
     level=logging.INFO,
-    format="%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s",
+    format="%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s:"
+           " %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 
@@ -79,7 +84,8 @@ class LabelMap:
                 ):
                     raise (
                         AssertionError(
-                            "ERROR: Indices and Names should have the same length!"
+                            "ERROR: Indices and Names should have"
+                            "the same length!"
                         )
                     )
                 for category in d["categories"]:
@@ -203,7 +209,7 @@ class CaffeDetection:
 
         # Parse the outputs.
         confidences = output[0, 0, :, 2]
-        state_confidences = output[0, 0, :, 3 : 3 + self.num_states]
+        state_confidences = output[0, 0, :, 3: 3 + self.num_states]
         xmin_coordinates = output[0, 0, :, 3 + self.num_states]
         ymin_coordinates = output[0, 0, :, 3 + self.num_states + 1]
         xmax_coordinates = output[0, 0, :, 3 + self.num_states + 2]
@@ -271,7 +277,7 @@ def main(args):
     )
 
     # Open test file in yml format
-    database = driveu_dataset.DriveuDatabase(args.test_file)
+    database = DriveuDatabase(args.test_file)
     database.open("")
 
     # Progressbar
@@ -282,10 +288,13 @@ def main(args):
         widgets=widgets, max_value=len(database.images)
     ).start()
 
+    # create axes
+    ax1 = plt.subplot(111)
+
     for idx, img in enumerate(database.images):
 
         # Get 8 bit color image from database
-        status, img_color_orig = img.getImage()
+        status, img_color_orig = img.get_image()
         # Crop image
         img_color = img_color_orig[0:512, 0:2048]
         # Detect with ssd
@@ -332,8 +341,17 @@ def main(args):
                     2,
                 )
         bar.update(idx)
-        cv2.imshow("SSD DTLD Results", img_color_orig)
-        cv2.waitKey(0)
+        # Because of the weird qt error in gui methods in opencv-python >= 3
+        # imshow does not work in some cases. You can try it by yourself.
+        # cv2.imshow("SSD DTLD Results", img_color_orig)
+        # cv2.waitKey(0)
+        img_rgb = img_color_orig[..., ::-1]
+        if idx == 0:
+            im1 = ax1.imshow(img_rgb)
+        plt.ion()
+        im1.set_data(img_rgb)
+        plt.pause(0.1)
+        plt.draw()
     bar.finish()
 
 
