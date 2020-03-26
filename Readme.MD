@@ -11,9 +11,9 @@ Following steps are recommended:
 
 The code can be used in two ways:
 
-1. Use TL-SSD only to detect smaller objects with our adaptions in the prior box layer WITHOUT a subsequent state detection. 
+1. Use TL-SSD only to detect smaller objects with our adaptions in the prior box layer WITHOUT a subsequent state detection.
 
-2. Use TL-SSD to detect smaller objects AND use the additional state prediction. 
+2. Use TL-SSD to detect smaller objects AND use the additional state prediction.
 
 ## Only use the prior box adaptions
 A possible usage of the MultiBoxLayer looks as follows:
@@ -92,7 +92,7 @@ layer {
 }
 ```
 
-Offsets are "shiftings" of the prior box in the feature cell. offset_w in x direction, offset_h in y direction. Take a look into the code for detailed understanding. We modified further small things, which were hard-coded in the original implementation, such as one default prior box with aspect ratio of 1. Furthermore, we do not use the max_size parameters. 
+Offsets are "shiftings" of the prior box in the feature cell. offset_w in x direction, offset_h in y direction. Take a look into the code for detailed understanding. We modified further small things, which were hard-coded in the original implementation, such as one default prior box with aspect ratio of 1. Furthermore, we do not use the max_size parameters.
 ## Use the prior box adaptions AND state detection for TLD
 
 ```
@@ -163,12 +163,12 @@ state_weight: 1.0
 num_states: 6
 
 ```
-4. Specify the background state id. See explanations of 3. 
+4. Specify the background state id. See explanations of 3.
 ```
 background_state_id: 0
 
 ```
-5. Specify the state digit. 
+5. Specify the state digit.
 ```
 state_digit: 4
 ```
@@ -198,9 +198,25 @@ state_loss_type: LOGISTIC
 ```
 ## Test our provided caffemodel on the DriveU Traffic Light Dataset
 1. Download the dataset http://traffic-light-data.de/
+2. Clone the dataset repository needed for dataset loading: https://github.com/julimueller/dtld_parsing (follow the instructions in the Readme)
+
 ```
 cd test_on_dtld
 
-python ssd_dtld_test.py --predictionmap_file <tl_ssd_path>/test_on_dtld/prediction_map_ssd_states.json --confidence 0.2 --deploy_file <tl_sdd_path>/prototxt/deploy.prototxt --caffemodel_file <tl_sdd_path>caffemodel/SSD_DTLD_iter_90000.caffemodel --test_file <db_dir_path>/DTLD_test.yml
+python3 ssd_dtld_test.py --predictionmap_file <tl_ssd_path>/test_on_dtld/prediction_map_ssd_states.json --confidence 0.2 --deploy_file <tl_sdd_path>/prototxt/deploy.prototxt --caffemodel_file <tl_sdd_path>caffemodel/SSD_DTLD_iter_90000.caffemodel --test_file <db_dir_path>/DTLD_test.yml
 ```
 Do not forget to update the absolute caffe ssd path in ssd_dtld_test.py before importing
+
+Please note that caffe has to be compiled with python 3 to work. If you get any PyInit error while importing caffe this may be the issue. Try to change
+
+```
+set(python_version "2" CACHE STRING "Specify which Python version to use")
+```
+
+to
+
+```
+set(python_version "3" CACHE STRING "Specify which Python version to use")
+```
+
+in the CMakeLists.txt of the original SSD repository.
