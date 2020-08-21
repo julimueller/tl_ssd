@@ -27,7 +27,8 @@ os.environ["GLOG_minloglevel"] = "2"
 
 
 # Make sure that caffe is on the python path:
-caffe_root = "./"
+caffe_root = os.path.join(os.path.expanduser("~"), "caffe")
+print(f"Caffe Root: {caffe_root}")
 os.chdir(caffe_root)
 sys.path.insert(0, os.path.join(caffe_root, "python"))
 
@@ -45,6 +46,7 @@ RGB_MEAN = [60, 60, 60]
 IMAGE_MAX_VALUE = 255
 SSD_INPUT_IMAGE_WIDTH = 2048
 SSD_INPUT_IMAGE_HEIGHT = 512
+DATABASE_DIR = "/media/user/disk/Datasets/TrafficLightRecognition/DTLD"
 
 
 class LabelMap:
@@ -186,7 +188,7 @@ class CaffeDetection:
         self.transformer.set_mean("data", np.array(RGB_MEAN))
         # The reference model operates on images in [0,255] range
         # instead of [0,1]
-        self.transformer.set_raw_scale("data", IMAGE_MAX_VALUE)
+        self.transformer.set_raw_scale("data", 255//IMAGE_MAX_VALUE)
         # Get names and indices for state prediction
         self.label_map = LabelMap(labelmap_file_path)
         # Get number of states
@@ -276,9 +278,13 @@ def main(args):
         args.predictionmap_file,
     )
 
+    # Check if DATABASE_DIR actually exists
+    if not os.path.exists(DATABASE_DIR):
+        raise NotADirectoryError(f"DATABASE_DIR: '{DATABASE_DIR}' doesn't exist!")
+        
     # Open test file in yml format
     database = DriveuDatabase(args.test_file)
-    database.open("")
+    database.open(DATABASE_DIR)
 
     # Progressbar
     warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -296,7 +302,7 @@ def main(args):
         # Get 8 bit color image from database
         status, img_color_orig = img.get_image()
         # Crop image
-        img_color = img_color_orig[0:512, 0:2048]
+        img_color = img_color_orig[0:SSD_INPUT_IMAGE_HEIGHT, 0:SSD_INPUT_IMAGE_WIDTH]
         # Detect with ssd
         result = detection.detect(img_color, args.confidence)
         # Plot each detection
@@ -320,6 +326,7 @@ def main(args):
                 cv2.rectangle(
                     img_color_orig, (xmin, ymin), (xmax, ymax), (0, 0, 255), 2
                 )
+
             elif "green" in item["tags"]:
                 cv2.rectangle(
                     img_color_orig, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2
@@ -332,6 +339,7 @@ def main(args):
                     (0, 255, 255),
                     2,
                 )
+
             else:
                 cv2.rectangle(
                     img_color_orig,
@@ -340,6 +348,7 @@ def main(args):
                     (255, 255, 255),
                     2,
                 )
+
         bar.update(idx)
         # Because of the weird qt error in gui methods in opencv-python >= 3
         # imshow does not work in some cases. You can try it by yourself.
